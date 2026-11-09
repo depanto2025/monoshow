@@ -23,22 +23,12 @@ def add_cors(resp):
     resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
     return resp
 
-@app.route('/', methods=['GET'])
-@app.route('/api/health', methods=['GET'])
-def health():
-    return jsonify({
-        "status": "online",
-        "service": "SNB Statement AI Cloud Parser",
-        "version": "2.0.0"
-    })
-
-@app.route('/api/preview-pdf', methods=['POST', 'OPTIONS'])
-def preview_pdf():
+def do_preview():
     if request.method == 'OPTIONS':
         return ('', 204)
         
     if 'files' not in request.files and 'file' not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
+        return jsonify({"error": "No file uploaded", "keys": list(request.files.keys())}), 400
         
     uploaded_files = request.files.getlist('files')
     if not uploaded_files:
@@ -112,7 +102,42 @@ def preview_pdf():
                 
     return jsonify({"previews": previews, "count": len(previews)})
 
-# For local testing
+@app.route('/', methods=['GET', 'POST', 'OPTIONS'])
+def root():
+    if request.method == 'POST':
+        return do_preview()
+    return jsonify({
+        "status": "online",
+        "service": "SNB Statement AI Cloud Parser",
+        "version": "2.0.0",
+        "path": request.path
+    })
+
+@app.route('/api/preview-pdf', methods=['POST', 'OPTIONS'])
+@app.route('/preview-pdf', methods=['POST', 'OPTIONS'])
+def preview_endpoint():
+    return do_preview()
+
+@app.route('/api/health', methods=['GET'])
+@app.route('/health', methods=['GET'])
+def health_endpoint():
+    return jsonify({
+        "status": "online",
+        "service": "SNB Statement AI Cloud Parser",
+        "version": "2.0.0"
+    })
+
+# Universal catch-all so Vercel can never 404 regardless of rewrites
+@app.route('/<path:subpath>', methods=['GET', 'POST', 'OPTIONS'])
+def catch_all(subpath):
+    if request.method == 'POST' or 'preview' in subpath:
+        return do_preview()
+    return jsonify({
+        "status": "online",
+        "service": "SNB Statement AI Cloud Parser",
+        "version": "2.0.0",
+        "subpath": subpath
+    })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001)
-
